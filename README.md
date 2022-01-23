@@ -8,4 +8,13 @@ To achieve this, data visualisations will be used in order to develop clarificat
 
 ### Prerequisites
 
-The tableau workbook requires [Tableau](https://www.tableau.com/en-gb) software to be open. Once it's installed simply click on the workbook to open it.
+The tableau workbook requires [Tableau](https://www.tableau.com/en-gb) software to be opened.Once it's installed you just have to click on the workbook to open it.
+
+### Folder Content:
+```
+README.md -> this file
+
+datasets/ -> The datasets used
+Pattern Identification In Metropolitan Cities.pdf -> The project report
+SOURCE CODE FOLDER -> Contains the Tableau workbook and Other rmd file
+```
