@@ -1,0 +1,237 @@
+---
+title: "Data Visualization Project"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Data Pre-Processing
+
+
+```{r}
+library(caTools)
+library(ggplot2)
+library(tidyverse)
+library(caret)
+```
+
+
+```{r}
+data1 <- read.csv("accidents_2017.csv")
+head(data1)
+```
+
+
+```{r}
+df2 <- data1 %>%
+  group_by(Mild.injuries) %>%
+  summarize(count = n())
+df2
+```
+
+
+```{r}
+data1 <- data1 %>% mutate(Injury = case_when(Mild.injuries==0 & Serious.injuries==0 ~ 'No', Mild.injuries>0 & Serious.injuries>0 ~ 'Yes', Mild.injuries>0 & Serious.injuries==0 ~ 'Yes', Mild.injuries==0 & Serious.injuries>0 ~ 'Yes'))
+df2 <- data1%>%
+  group_by(Injury)%>%
+  summarize(count = n())
+df2
+```
+
+### Decision Tree
+
+```{r}
+library(party)
+```
+
+
+```{r}
+data1 <- data1 %>% mutate(Injury_numeric = case_when(Mild.injuries==0 & Serious.injuries==0 ~ 0, Mild.injuries>0 & Serious.injuries>0 ~ 1, Mild.injuries>0 & Serious.injuries==0 ~ 1, Mild.injuries==0 & Serious.injuries>0 ~ 1))
+df2 <- data1%>%
+  group_by(Injury_numeric)%>%
+  summarize(count = n())
+df2
+```
+
+
+
+```{r}
+str(data1)
+```
+
+
+```{r}
+input.dat <- data1%>%
+  dplyr::select(Injury,Part.of.the.day,Day,Hour)
+
+```
+
+```{r}
+input.dat1 <- data1%>%
+  dplyr::select(Injury_numeric,Part.of.the.day,Day,Hour)
+```
+
+
+```{r}
+df3 <- factor(input.dat$Injury)
+input.dat$Injury = df3
+df3 <- factor(input.dat$Part.of.the.day)
+input.dat$Part.of.the.day = df3
+
+
+```
+
+
+
+```{r}
+str(input.dat)
+sum(is.na(input.dat))
+```
+
+```{r}
+sample = sample.split(input.dat$Injury, SplitRatio = .75)
+train = subset(input.dat, sample == TRUE)
+test  = subset(input.dat, sample == FALSE)
+dim(train)
+dim(test)
+```
+
+
+
+```{r}
+output.tree <- ctree(
+  Injury ~ Part.of.the.day + Day + Hour  , 
+  data = train)
+
+plot(output.tree)
+```
+
+
+```{r}
+predict_model<-predict(output.tree, test)
+```
+
+```{r}
+m_at <- table(test$Injury, predict_model)
+m_at
+```
+
+
+```{r}
+ac_Test <- sum(diag(m_at)) / sum(m_at)
+print(paste('Accuracy for test is found to be', ac_Test))
+```
+
+### Random Forest
+
+
+```{r}
+library(randomForest)
+```
+
+```{r}
+output.forest <- randomForest(Injury ~ Part.of.the.day + Day + Hour , 
+           data = train, importance=TRUE, mtry=2, ntree=100)
+```
+
+
+```{r}
+print(output.forest)
+```
+
+```{r}
+pred = predict(output.forest, test)
+```
+
+```{r}
+cm = table(test[,1], pred)
+cm
+```
+
+```{r}
+ac_Test <- sum(diag(cm)) / sum(cm)
+print(paste('Accuracy for test is found to be', ac_Test))
+```
+
+
+```{r}
+print(importance(output.forest)) 
+varImpPlot(output.forest)
+```
+
+
+### XGBoost
+
+
+```{r}
+library(xgboost)
+```
+
+
+```{r}
+
+
+#split into training (80%) and testing set (20%)
+parts = createDataPartition(input.dat1$Injury_numeric, p = .8, list = F)
+train = input.dat1[parts, ]
+test = input.dat1[-parts, ]
+
+#define predictor and response variables in training set
+train_x = data.matrix(train[,2:4])
+train_y = train[,1]
+
+
+```
+
+```{r}
+input.dat1$Injury_numeric <- factor(input.dat1$Injury_numeric)
+```
+
+```{r}
+#define predictor and response variables in testing set
+test_x = data.matrix(test[, 2:4])
+test_y = test[, 1]
+
+#define final training and testing sets
+xgb_train = xgb.DMatrix(data = train_x, label = train_y)
+xgb_test = xgb.DMatrix(data = test_x, label = test_y)
+xgb_params <- list(
+  booster = "gbtree",
+  eta = 0.1,
+  max_depth = 8,
+  gamma = 4,
+  subsample = 0.75,
+  colsample_bytree = 1,
+  objective = "multi:softprob",
+  eval_metric = "mlogloss",
+  num_class = length(levels(input.dat1$Injury_numeric))
+)
+```
+
+```{r}
+model = xgb.train(data = xgb_train, params = xgb_params, nrounds = 500, verbose=1)
+model
+```
+
+```{r}
+xgb_preds <- predict(model,xgb_test, reshape = TRUE)
+xgb_preds <- as.data.frame(xgb_preds)
+colnames(xgb_preds) <- levels(input.dat1$Injury_numeric)
+head(xgb_preds)
+```
+
+```{r}
+xgb_preds$PredictedClass <- apply(xgb_preds,1, function(y) colnames(xgb_preds)[which.max(y)])
+xgb_preds$ActualClass <- levels(input.dat1$Injury_numeric)[test_y + 1] 
+head(xgb_preds)
+```
+
+```{r}
+accuracy <- sum(xgb_preds$PredictedClass == xgb_preds$ActualClass) / nrow(xgb_preds)
+accuracy
+```
+
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
