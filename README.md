@@ -13,7 +13,7 @@ Once it's installed you just have to click on the workbook to open it.
 
 ### Folder Content:
 ```
-README.md -> this file
+README.md -> this file contains info 
 
 datasets/ -> The datasets used
 Pattern Identification In Metropolitan Cities.pdf -> The project report
